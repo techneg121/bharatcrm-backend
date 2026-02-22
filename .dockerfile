@@ -3,19 +3,16 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install deps
-RUN npm install
-
-# Copy full source FIRST
+# Copy everything first
 COPY . .
 
-# Generate Prisma AFTER full copy
+# Install ALL deps (dev needed for prisma + nest build)
+RUN npm install
+
+# Generate prisma client AFTER install
 RUN npx prisma generate
 
-# Build Nest
+# Build nest
 RUN npm run build
 
 
@@ -24,17 +21,15 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Copy only needed files
 COPY package*.json ./
-
-# Install prod deps
 RUN npm install --omit=dev
 
-# Copy prisma
-COPY prisma ./prisma
-
-# Copy built output + node_modules
-COPY --from=builder /app/node_modules ./node_modules
+# Copy prisma + generated client + dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/dist ./dist
 
-# Run migrations + start
+# Run migrations then start
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
