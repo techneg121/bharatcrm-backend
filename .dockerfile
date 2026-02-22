@@ -6,17 +6,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# ⭐ Install ALL deps (including dev)
+# Install deps
 RUN npm install
 
-# Copy prisma schema
-COPY prisma ./prisma
-
-# ⭐ Generate prisma client
-RUN npx prisma generate
-
-# Copy rest of source
+# Copy full source FIRST
 COPY . .
+
+# Generate Prisma AFTER full copy
+RUN npx prisma generate
 
 # Build Nest
 RUN npm run build
@@ -29,15 +26,15 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# ⭐ Only production deps here
+# Install prod deps
 RUN npm install --omit=dev
 
-# Copy prisma (needed for migrate)
+# Copy prisma
 COPY prisma ./prisma
 
-# Copy built files + node_modules from builder
+# Copy built output + node_modules
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
-# ⭐ Run migrations then start
+# Run migrations + start
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
