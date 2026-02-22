@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * =========================
+ * ENUMS
+ * =========================
+ */
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  SALES
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+}
+
+enum DealStage {
+  PROSPECT
+  DISCUSSION
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  WHATSAPP
+  TASK
+  STATUS_CHANGE
+}
+
+/**
+ * =========================
+ * CORE AUTH & ORG
+ * =========================
+ */
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users      User[]
+  leads      Lead[]
+  deals      Deal[]
+  contacts   Contact[]
+  companies  Company[]
+  workflows  Workflow[]
+  activities Activity[]
+  tasks      Task[]
+}
+
+model User {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+  role     Role   @default(SALES)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  leads      Lead[]     @relation("LeadOwner")
+  deals      Deal[]     @relation("DealOwner")
+  tasks      Task[]
+  activities Activity[]
+
+  createdAt DateTime @default(now())
+}
+
+/**
+ * =========================
+ * LEADS
+ * =========================
+ */
+
+model Lead {
+  id        String     @id @default(uuid())
+  title     String
+  company   String?
+  phone     String?
+  email     String?
+  value     Float?
+  source    String?
+  status    LeadStatus @default(NEW)
+  score     Int?
+  aiSummary String?
+
+  ownerId String?
+  owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  contacts   Contact[]
+  deals      Deal[]
+  activities Activity[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([orgId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+/**
+ * =========================
+ * DEALS
+ * =========================
+ */
+
+model Deal {
+  id          String    @id @default(uuid())
+  title       String
+  value       Float?
+  stage       DealStage
+  probability Int?
+
+  ownerId String?
+  owner   User?   @relation("DealOwner", fields: [ownerId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  activities Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([ownerId])
+  @@index([stage])
+}
+
+/**
+ * =========================
+ * CONTACTS & COMPANIES
+ * =========================
+ */
+
+model Company {
+  id       String  @id @default(uuid())
+  name     String
+  industry String?
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  contacts Contact[]
+  deals    Deal[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+model Contact {
+  id       String  @id @default(uuid())
+  name     String
+  email    String?
+  phone    String?
+  position String?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+/**
+ * =========================
+ * TASKS & ACTIVITIES
+ * =========================
+ */
+
+model Task {
+  id        String    @id @default(uuid())
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  leadId String?
+  dealId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+model Activity {
+  id      String       @id @default(uuid())
+  type    ActivityType
+  content String?
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+/**
+ * =========================
+ * WORKFLOWS
+ * =========================
+ */
+
+model Workflow {
+  id      String  @id @default(uuid())
+  name    String
+  enabled Boolean @default(true)
+
+  trigger   Json
+  condition Json
+  action    Json
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+
+  entity    String   // LEAD / DEAL / CONTACT etc
+  entityId  String
+
+  field     String
+  fromValue String?
+  toValue   String?
+
+  userId String
+  orgId  String
+
+  createdAt DateTime @default(now())
+
+  @@index([entityId])
+  @@index([orgId])
+}

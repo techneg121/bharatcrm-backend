@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Lead"
+ADD COLUMN "company" TEXT,
+ADD COLUMN "phone" TEXT,
+ADD COLUMN "email" TEXT,
+ADD COLUMN "value" DOUBLE PRECISION;
